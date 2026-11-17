@@ -1,0 +1,260 @@
+#!/usr/bin/env bash
+# artix-update - safe system update wrapper for Arch Linux and Artix Linux
+# Does not depend on any distro-specific tooling from Arch derivatives.
+#
+# Usage: artix-update [options]
+#   -m, --mirrors      refresh the mirror list (reflector on Arch, rankmirrors on Artix)
+#   -a, --aur          also update AUR packages (paru or yay, if installed)
+#   -f, --flatpak      also update Flatpak apps
+#   -c, --clean        clean the package cache (paccache, keep the last 2 versions)
+#   -n, --news         show latest news from archlinux.org (Arch only)
+#   -S, --no-snapshot  skip the pre-update snapshot
+#   -y, --yes          do not ask for confirmation (--noconfirm)
+#   -h, --help         show this help
+
+set -uo pipefail
+
+LOG_FILE="/var/log/artix-update.log"
+DO_MIRRORS=0 DO_AUR=0 DO_FLATPAK=0 DO_CLEAN=0 DO_NEWS=0 DO_SNAPSHOT=1 ASSUME_YES=0
+
+# ---------- colors / helpers ----------
+if [[ -t 1 ]]; then
+    B=$'\e[1m'; R=$'\e[31m'; G=$'\e[32m'; Y=$'\e[33m'; C=$'\e[36m'; N=$'\e[0m'
+else
+    B="" R="" G="" Y="" C="" N=""
+fi
+msg()  { printf '%s==>%s %s%s%s\n' "$G" "$N" "$B" "$*" "$N"; }
+info() { printf '%s  ->%s %s\n' "$C" "$N" "$*"; }
+warn() { printf '%s==> WARNING:%s %s\n' "$Y" "$N" "$*" >&2; }
+die()  { printf '%s==> ERROR:%s %s\n' "$R" "$N" "$*" >&2; exit 1; }
+have() { command -v "$1" >/dev/null 2>&1; }
+
+usage() { sed -n '2,13p' "$0" | sed 's/^# \{0,1\}//'; exit 0; }
+
+# ---------- arguments ----------
+for arg in "$@"; do
+    case "$arg" in
+        -m|--mirrors)     DO_MIRRORS=1 ;;
+        -a|--aur)         DO_AUR=1 ;;
+        -f|--flatpak)     DO_FLATPAK=1 ;;
+        -c|--clean)       DO_CLEAN=1 ;;
+        -n|--news)        DO_NEWS=1 ;;
+        -S|--no-snapshot) DO_SNAPSHOT=0 ;;
+        -y|--yes)         ASSUME_YES=1 ;;
+        -h|--help)        usage ;;
+        *) die "Unknown option: $arg (use --help)" ;;
+    esac
+done
+
+PACMAN_FLAGS=()
+(( ASSUME_YES )) && PACMAN_FLAGS+=(--noconfirm)
+
+# ---------- root ----------
+if [[ $EUID -ne 0 ]]; then
+    have sudo || die "Run as root or install sudo."
+    exec sudo -E "$0" "$@"
+fi
+
+# The user who invoked the script (needed for AUR/Flatpak, we never build as root)
+REAL_USER="${SUDO_USER:-}"
+
+# log to both file and screen
+mkdir -p "$(dirname "$LOG_FILE")" 2>/dev/null
+exec > >(tee -a "$LOG_FILE") 2>&1
+echo; echo "===== $(date '+%F %T') artix-update ====="
+
+# ---------- detect distro and init system ----------
+DISTRO="arch"
+# shellcheck disable=SC1091
+[[ -r /etc/os-release ]] && . /etc/os-release
+case "${ID:-}" in
+    artix) DISTRO="artix" ;;
+    arch|endeavouros|manjaro|cachyos|garuda) DISTRO="arch" ;;
+    *) [[ "${ID_LIKE:-}" == *arch* ]] || warn "Unknown distribution (${ID:-?}), treating it as Arch." ;;
+esac
+
+INIT="other"
+if   [[ -d /run/systemd/system ]];        then INIT="systemd"
+elif have rc-status;                      then INIT="openrc"
+elif have sv && [[ -d /run/runit ]];      then INIT="runit"
+elif have s6-rc;                          then INIT="s6"
+elif have dinitctl;                       then INIT="dinit"
+fi
+msg "Detected: $DISTRO (init: $INIT)"
+
+# ---------- pre-flight checks ----------
+msg "Checking network connectivity"
+if ! ping -c1 -W3 archlinux.org >/dev/null 2>&1 && ! ping -c1 -W3 1.1.1.1 >/dev/null 2>&1; then
+    die "No network connection."
+fi
+
+# free space on / (at least 2 GiB)
+free_kb=$(df --output=avail / | tail -1 | tr -d ' ')
+(( free_kb < 2*1024*1024 )) && warn "Low disk space on / ($(( free_kb/1024 )) MiB). The update may fail."
+
+# ---------- pacman lock ----------
+DB_LOCK="/var/lib/pacman/db.lck"
+if [[ -e $DB_LOCK ]]; then
+    if pgrep -x pacman >/dev/null || pgrep -x paru >/dev/null || pgrep -x yay >/dev/null; then
+        die "Another pacman/AUR helper process is running. Wait for it to finish."
+    fi
+    warn "Found stale $DB_LOCK, removing it."
+    rm -f "$DB_LOCK"
+fi
+
+# ---------- news (Arch) ----------
+if (( DO_NEWS )); then
+    if [[ $DISTRO == arch ]] && have curl; then
+        msg "Latest news from archlinux.org"
+        curl -fsS --max-time 10 https://archlinux.org/feeds/news/ 2>/dev/null \
+            | grep -oP '(?<=<title>).*?(?=</title>)' | sed -n '2,6p' | sed 's/^/   • /' \
+            || warn "Could not fetch the news feed."
+        echo "   Full list: https://archlinux.org/news/"
+    else
+        warn "The --news option only works on Arch and requires curl."
+    fi
+fi
+
+# ---------- snapshot ----------
+if (( DO_SNAPSHOT )); then
+    if have snapper && snapper list-configs 2>/dev/null | grep -qw root; then
+        msg "Creating snapshot (snapper)"
+        snapper -c root create -d "artix-update: pre-update snapshot" \
+            || warn "snapper snapshot failed."
+    elif have timeshift && timeshift --list >/dev/null 2>&1; then
+        msg "Creating snapshot (timeshift)"
+        timeshift --create --comments "artix-update: pre-update snapshot" --scripted \
+            || warn "timeshift snapshot failed."
+    else
+        info "No snapper/timeshift found, skipping snapshot."
+    fi
+fi
+
+# ---------- mirrors ----------
+if (( DO_MIRRORS )); then
+    msg "Refreshing mirror list"
+    cp -f /etc/pacman.d/mirrorlist /etc/pacman.d/mirrorlist.bak
+    if [[ $DISTRO == arch ]]; then
+        if have reflector; then
+            reflector --latest 20 --protocol https --sort rate --save /etc/pacman.d/mirrorlist \
+                || { warn "reflector failed, restoring the previous mirror list."; cp -f /etc/pacman.d/mirrorlist.bak /etc/pacman.d/mirrorlist; }
+        else
+            warn "Install 'reflector' to refresh mirrors."
+        fi
+    else
+        if have rankmirrors; then
+            tmp=$(mktemp)
+            if rankmirrors -n 10 /etc/pacman.d/mirrorlist.bak > "$tmp" && [[ -s $tmp ]]; then
+                install -m644 "$tmp" /etc/pacman.d/mirrorlist
+            else
+                warn "rankmirrors failed, keeping the previous mirror list."
+            fi
+            rm -f "$tmp"
+        else
+            warn "Install 'pacman-contrib' (rankmirrors) to refresh mirrors."
+        fi
+    fi
+fi
+
+# ---------- keyrings ----------
+# Refresh the databases and keyrings first, then run the full upgrade right away
+# (pacman -Sy without a following -Su is a partial upgrade, which we avoid).
+KEYRINGS=()
+pacman -Qq archlinux-keyring >/dev/null 2>&1 && KEYRINGS+=(archlinux-keyring)
+pacman -Qq artix-keyring     >/dev/null 2>&1 && KEYRINGS+=(artix-keyring)
+
+msg "Syncing databases and refreshing keyrings: ${KEYRINGS[*]:-none}"
+if (( ${#KEYRINGS[@]} )); then
+    pacman -Sy --needed "${PACMAN_FLAGS[@]}" "${KEYRINGS[@]}" \
+        || {
+            warn "Keyring update failed, trying to rebuild the keys."
+            pacman-key --init
+            pacman-key --populate "${KEYRINGS[@]/-keyring/}" 2>/dev/null || pacman-key --populate
+            pacman -Sy --needed "${PACMAN_FLAGS[@]}" "${KEYRINGS[@]}" || die "Could not refresh keyrings."
+        }
+else
+    pacman -Sy || die "Database sync failed."
+fi
+
+# ---------- main upgrade ----------
+msg "Upgrading system (pacman -Su)"
+if ! pacman -Su "${PACMAN_FLAGS[@]}"; then
+    die "pacman -Su failed. Check the messages above and $LOG_FILE."
+fi
+
+# ---------- AUR ----------
+if (( DO_AUR )); then
+    if [[ -z $REAL_USER || $REAL_USER == root ]]; then
+        warn "AUR: refusing to build packages as root. Run via sudo from a regular user account."
+    elif have paru; then
+        msg "Updating AUR packages (paru)"
+        sudo -u "$REAL_USER" paru -Sua "${PACMAN_FLAGS[@]}"
+    elif have yay; then
+        msg "Updating AUR packages (yay)"
+        sudo -u "$REAL_USER" yay -Sua "${PACMAN_FLAGS[@]}"
+    else
+        warn "Neither paru nor yay found, skipping AUR."
+    fi
+fi
+
+# ---------- Flatpak ----------
+if (( DO_FLATPAK )); then
+    if have flatpak; then
+        msg "Updating Flatpak apps"
+        flatpak update -y
+    else
+        warn "Flatpak is not installed."
+    fi
+fi
+
+# ---------- cache cleanup ----------
+if (( DO_CLEAN )); then
+    if have paccache; then
+        msg "Cleaning package cache (keeping the last 2 versions)"
+        paccache -rk2
+        paccache -ruk0
+    else
+        warn "Install 'pacman-contrib' to use paccache."
+    fi
+fi
+
+# ---------- post-update summary ----------
+echo
+msg "Summary"
+
+# .pacnew / .pacsave
+mapfile -t pacfiles < <(find /etc -xdev \( -name '*.pacnew' -o -name '*.pacsave' \) 2>/dev/null)
+if (( ${#pacfiles[@]} )); then
+    warn "Config files that need manual merging (${#pacfiles[@]}):"
+    printf '   %s\n' "${pacfiles[@]}"
+    have pacdiff && info "Use: sudo pacdiff"
+else
+    info "No .pacnew/.pacsave files found."
+fi
+
+# orphaned packages
+mapfile -t orphans < <(pacman -Qdtq 2>/dev/null)
+if (( ${#orphans[@]} )); then
+    warn "Orphaned packages (${#orphans[@]}): ${orphans[*]}"
+    info "Remove after reviewing: sudo pacman -Rns \$(pacman -Qdtq)"
+fi
+
+# failed services
+case "$INIT" in
+    systemd)
+        failed=$(systemctl --failed --no-legend --plain 2>/dev/null | awk '{print $1}')
+        [[ -n $failed ]] && { warn "Services in failed state:"; echo "$failed" | sed 's/^/   /'; } ;;
+    openrc)
+        crashed=$(rc-status --crashed 2>/dev/null | sed -n '/\[ *crashed *\]/p')
+        [[ -n $crashed ]] && { warn "Crashed services:"; echo "$crashed" | sed 's/^/   /'; } ;;
+esac
+
+# reboot needed? (running kernel vs installed modules)
+if [[ ! -d "/usr/lib/modules/$(uname -r)" ]]; then
+    warn "The kernel was updated - a REBOOT is recommended (running: $(uname -r))."
+else
+    info "Running kernel ($(uname -r)) still matches the installed modules."
+fi
+
+echo
+msg "Done. Log: $LOG_FILE"

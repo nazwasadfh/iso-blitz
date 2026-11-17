@@ -1,0 +1,8 @@
+BlitzArt Linux (based on Artix Linux) -- text-only live session
+
+To install BlitzArt to a disk, run:
+    sudo blitzinstall
+
+The installed system comes with the full Hyprland desktop (sddm, pipewire),
+btrfs + snapper snapshots in the GRUB menu, zram swap and the blitz toolbox.
+The toolbox is also available here: blitz (try: blitz help)

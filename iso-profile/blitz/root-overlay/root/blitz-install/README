@@ -1,0 +1,21 @@
+# BlitzArt Linux -- live session
+
+This directory is copied onto the ISO. To install BlitzArt to a disk:
+
+    sudo blitzinstall
+
+(the `blitzinstall` command starts install-1.sh; it is also on PATH as
+/usr/local/bin/blitzinstall on the live ISO).
+
+Live session user:  blitz / blitz
+
+Files here:
+  install-1.sh         stage 1: partitioning, btrfs, system copy, calls stage 2
+  install-2.sh         stage 2: config, repos, GRUB, snapper, zram, services
+  install-dotfiles.sh  optional dotfiles installer (asked during stage 2)
+  blitz                system toolbox (also installed into the target system)
+  blitzinstall         wrapper that starts install-1.sh (also installed as
+                       /usr/local/bin/blitzinstall into the target system)
+
+The installed system is BlitzArt Linux: btrfs + snapper snapshots in the GRUB
+menu, zram swap, dinit services, blitz toolbox. Reboot after stage 2 finishes.

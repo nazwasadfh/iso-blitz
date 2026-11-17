@@ -1,0 +1,32 @@
+#!/bin/bash
+# blitzinstall -- start the BlitzArt installer (install-1.sh)
+#
+# Works on the live ISO (installer at /root/blitz-install) and on an installed
+# system or a plain directory with the repository scripts. Root rights are
+# acquired by install-1.sh itself (it re-executes with sudo).
+#
+# Usage: blitzinstall [any install-1.sh args]
+
+set -u
+
+if [[ $0 == */* ]]; then
+    self_dir="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" && pwd)"
+else
+    self_dir="$(pwd)"
+fi
+
+target=""
+for d in "$self_dir" /root/blitz-install /install /usr/local/lib/blitzart; do
+    if [[ -f $d/install-1.sh ]]; then
+        target=$d
+        break
+    fi
+done
+if [[ -z $target ]]; then
+    echo "blitzinstall: install-1.sh not found (looked in: $self_dir, /root/blitz-install, /install, /usr/local/lib/blitzart)" >&2
+    echo "Run it manually: sudo bash <path-to>/install-1.sh" >&2
+    exit 1
+fi
+
+echo "==> Starting the BlitzArt installer: $target/install-1.sh"
+exec bash "$target/install-1.sh" "$@"

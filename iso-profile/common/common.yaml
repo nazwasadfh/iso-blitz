@@ -1,0 +1,79 @@
+---
+# Packages common to all BlitzArt profiles.
+#
+# This is our own (trimmed) version of Artix's iso-profiles/common/common.yaml:
+# only what a BlitzArt ISO actually needs. buildiso loads these into every
+# layer: packages-base + packages-init.$INITSYS + packages-apps always, and
+# packages-xorg + packages-misc whenever the profile has a livefs (the BlitzArt
+# profile does not, so those stay empty here -- anything extra goes into the
+# profile's rootfs.packages).
+
+packages-base:
+  - base
+  - intel-ucode
+  - amd-ucode
+  - linux
+  - linux-firmware
+  - linux-headers
+  # filesystems (btrfs is the BlitzArt default, snapper lives in the profile)
+  - btrfs-progs
+  - dosfstools
+  - efibootmgr
+  - e2fsprogs
+  - exfatprogs
+  - f2fs-tools
+  - xfsprogs
+  - ntfs-3g
+  # boot
+  - grub
+  - artix-grub-theme        # TODO: replace with a BlitzArt grub theme
+  - os-prober
+  - mkinitcpio
+  - mkinitcpio-openswap
+  # base tools
+  - sudo
+  - nano
+  - net-tools
+  - inetutils
+  - iptables
+  - sysfsutils
+  - usbutils
+  - which
+  - zsh
+  - nbd
+  - logrotate
+  - lsb-release
+  - man-db
+  - man-pages
+
+packages-apps:
+  - inxi
+  - powertop
+
+# We ship our own common.yaml so these stay empty: no X11 server on the ISO.
+packages-xorg: []
+
+packages-misc:
+  - xdg-user-dirs
+  - xdg-utils
+  - wayland
+  - xorg-xwayland
+  - terminus-font
+
+packages-init:
+  dinit:
+    - blocaled
+    - elogind-dinit
+    - dbus-dinit
+    - acpid-dinit
+    - cronie-dinit
+    - ntp-dinit
+    - metalog-dinit
+    - networkmanager-dinit
+    - wpa_supplicant-dinit
+  openrc: []
+  runit: []
+  s6: []
+
+packages-boot:
+  - iso-initcpio

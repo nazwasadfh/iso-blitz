@@ -1,0 +1,91 @@
+---
+# BlitzArt Linux -- live ISO profile for artools (buildiso).
+#
+# TEXT-ONLY live ISO (like Artix's "base" profile): boots to a console login,
+# no graphical session running in the live system. BUT the rootfs contains the
+# COMPLETE BlitzArt system, desktop included -- because the installer does an
+# OFFLINE install: it rsync-copies this rootfs onto the target disk (exactly
+# how Artix's offline Calamares "unpack" install works). Zero downloads.
+#
+# No livefs layer (HAS_LIVE=false): the ISO boots the rootfs squashfs directly
+# and everything lives in `rootfs.packages` / `root-overlay`.
+# Packages installed != services started: the live services list has no sddm,
+# so the live session stays a console; the INSTALLED system gets its services
+# enabled by install-2.sh (enable_service) and boots to sddm/Hyprland.
+#
+# The installer (install-1.sh / install-2.sh / install-dotfiles.sh) is shipped
+# onto the ISO through root-overlay/root/blitz-install (symlinks dereferenced
+# by artools' copy_overlay). Boot the ISO, log in and run:
+#     sudo blitzinstall
+#
+# What stays ONLINE-only (nothing can be done about that from an ISO):
+#   - Chaotic-AUR and BlackArch repository setup (external repos)
+#   - end-4 dotfiles, oh-my-zsh, config.json, hyprpm plugins (git/AUR)
+
+live-session:
+  user: blitz
+  password: blitz
+  autologin: false
+  use-xlibre: false
+  services:
+    - acpid
+    - NetworkManager
+  # no user-services: nothing graphical runs in the live session
+
+rootfs:
+  packages:
+    # Arch repo bridge: provides mirrorlist-arch + archlinux keyring.
+    # [extra]/[multilib] must be enabled in the BUILD pacman.conf
+    # (iso/pacman.conf.d/iso-x86_64.conf) for the packages below.
+    - artix-archlinux-support
+    - grub-btrfs
+    - snapper
+    # offline install machinery: the installer rsync-copies the rootfs
+    - rsync
+    # shell + tools (mirrors install-2.sh)
+    - zsh-autosuggestions
+    - zsh-completions
+    - zsh-syntax-highlighting
+    - zsh-history-substring-search
+    - fzf
+    - fastfetch
+    - starship
+    - ugrep
+    - bat
+    - curl
+    - wget
+    - git
+    - base-devel            # needed by hyprpm on the installed system
+    # desktop of the INSTALLED system (baked in, not started in the live
+    # session -- install-2.sh enables sddm there)
+    - hyprland
+    - hyprpm
+    - xdg-desktop-portal-hyprland
+    - xdg-desktop-portal-gtk
+    - hyprpolkitagent
+    - kitty
+    # xdg basics (packages-misc only loads when a livefs exists -- we have none)
+    - xdg-user-dirs
+    - xdg-utils
+    - wayland
+    - xorg-xwayland
+    - terminus-font
+    # fonts
+    - ttf-dejavu
+    - ttf-victor-mono-nerd  # end-4 dotfiles font (comes from [extra])
+    # live boot tools -- with no livefs layer they belong in rootfs
+    - mkinitcpio-nfs-utils
+    - squashfs-tools
+    - artix-grub-live
+  packages-init:
+    dinit:
+      - artix-live-dinit    # live-session services (removed again by the
+                            # offline installer for the installed system)
+      - dinit-user-spawn    # spawns user dinit at login (pipewire etc.)
+      - sddm-dinit          # pulls sddm; only enabled for the installed system
+      - pipewire-dinit
+      - pipewire-pulse-dinit
+      - wireplumber-dinit
+    openrc: []
+    runit: []
+    s6: []

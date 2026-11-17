@@ -1,0 +1,8 @@
+NAME="BlitzArt Linux"
+PRETTY_NAME="BlitzArt Linux"
+ID=artix
+ID_LIKE=arch
+BUILD_ID=rolling
+ANSI_COLOR="0;34"
+HOME_URL="https://artixlinux.org/"
+LOGO=artix3
