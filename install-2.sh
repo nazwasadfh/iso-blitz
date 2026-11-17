@@ -424,6 +424,19 @@ for usvc in dbus pipewire pipewire-pulse wireplumber; do
     enable_service "$usvc" --user
 done
 
+# === Konfiguracja środowiska użytkownika ===
+# Upewniamy się, że XDG_RUNTIME_DIR jest ustawiony przy każdym loginie.
+# To naprawia błędy "XDG_RUNTIME_DIR is not set" oraz błędy hyprpm.
+user_zshrc="/home/$ARTIX_USERNAME/.zshrc"
+grep -qx 'export XDG_RUNTIME_DIR=/run/user/1000' "$user_zshrc" \
+    || { printf 'export XDG_RUNTIME_DIR=/run/user/1000\n' | cat - "$user_zshrc" > "$user_zshrc.tmp" && mv "$user_zshrc.tmp" "$user_zshrc"; }
+printf '\n# Ensure runtime dir exists on login\nmkdir -p $XDG_RUNTIME_DIR\nchmod 700 $XDG_RUNTIME_DIR\n' >> "$user_zshrc"
+
+# Włącz jeszcze raz usługi użytkownika (dla pewności)
+for usvc in dbus pipewire pipewire-pulse wireplumber; do
+    enable_service "$usvc" --user 2>/dev/null || true
+done
+
 # ---- Dotfiles (optional) -----------------------------------------------------------------------
 if [[ $install_dotfiles == y ]]; then
     log "Dotfiles"

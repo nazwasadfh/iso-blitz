@@ -129,12 +129,20 @@ Ważne szczegóły:
   zainstalowany w rootfs (jest w `packages-base` naszego `common.yaml`).
 - **"Package not found"** — nazwa zniknęła z repo; popraw listę w
   `iso-profile/blitz/profile.yaml` lub `iso-profile/common/common.yaml`.
+- **`XDG_RUNTIME_DIR is not set`** — `install-2.sh` dodaje eksport
+  `XDG_RUNTIME_DIR=/run/user/1000` do `~/.zshrc` oraz tworzy katalog runtime
+  (700). Po reinstalacji wystarczy ponowne zalogowanie, bez restartu.
+- **`hyprpm` → `no such file or dir .../hyprpm`** — ten sam problem
+  `XDG_RUNTIME_DIR`; hyprpm tworzy symlink w `/run/user/1000/hyprpm`, który
+  istnieje tylko gdy katalog istnieje. Po poprawce `~/.zshrc` hyprpm działa
+  od pierwszego razu.
+- **Usługi użytkownika (dbus, pipewire) nie startują** — ponowne
+  `enable_service --user` w `install-2.sh` po konfiguracji środowiska.
 - **Błędy podpisów PGP przy pakietach z [extra]** — chroot budowania startuje
   z keyringiem Artix; jeśli pacman odmówi, sprawdź czy na hoście masz
   `archlinux-keyring` (`sudo pacman-key --populate archlinux`) i odśwież.
   Ewentualnie wyłącz na chwilę sekcje `[extra]`/`[multilib]` w
   `iso/pacman.conf.d/iso-x86_64.conf`.
-- **Błędy podpisów PGP przy pakietach z [extra]** — chroot budowania startuje
 - **Chrooty**: pełne czyszczenie co build (`clean_first=true` domyślnie).
   Szybsze iteracje: `./make-iso.sh -c` (nie czyści chrootów) albo etapowo
   `buildiso -p blitz -i dinit -x` → `-s` → `-b` → `-z`.
