@@ -112,13 +112,17 @@ Ważne szczegóły:
 
 ## Troubleshooting
 
+- **`cp: cannot stat .../boot/memtest86+/memtest.bin`** — `prepare_boot_extras`
+  w artools kopiuje memtest bezwarunkowo; pakiet `memtest86+` musi być
+  zainstalowany w rootfs (jest w `packages-base` naszego `common.yaml`).
+- **"Package not found"** — nazwa zniknęła z repo; popraw listę w
+  `iso-profile/blitz/profile.yaml` lub `iso-profile/common/common.yaml`.
 - **Błędy podpisów PGP przy pakietach z [extra]** — chroot budowania startuje
   z keyringiem Artix; jeśli pacman odmówi, sprawdź czy na hoście masz
   `archlinux-keyring` (`sudo pacman-key --populate archlinux`) i odśwież.
   Ewentualnie wyłącz na chwilę sekcje `[extra]`/`[multilib]` w
   `iso/pacman.conf.d/iso-x86_64.conf`.
-- **"Package not found"** — nazwa zniknęła z repo; popraw listę w
-  `iso-profile/blitz/profile.yaml` lub `iso-profile/common/common.yaml`.
+- **Błędy podpisów PGP przy pakietach z [extra]** — chroot budowania startuje
 - **Chrooty**: pełne czyszczenie co build (`clean_first=true` domyślnie).
   Szybsze iteracje: `./make-iso.sh -c` (nie czyści chrootów) albo etapowo
   `buildiso -p blitz -i dinit -x` → `-s` → `-b` → `-z`.

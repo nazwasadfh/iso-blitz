@@ -45,6 +45,10 @@ packages-base:
   - lsb-release
   - man-db
   - man-pages
+  # artools' prepare_boot_extras unconditionally copies
+  # /boot/memtest86+/memtest.bin from the bootfs overlay, so this package
+  # MUST be installed (it is small; Artix ships it in every ISO too)
+  - memtest86+
 
 packages-apps:
   - inxi
