@@ -77,6 +77,108 @@ rootfs:
     - mkinitcpio-nfs-utils
     - squashfs-tools
     - artix-grub-live
+    # ---- end-4 (illogical-impulse) dependencies, baked in --------------------------
+    # The II installer installs its deps through local meta-packages; this is the
+    # union of their depends/makedepends that exists in the Arch/Artix repos
+    # (extracted from sdata/dist-arch/illogical-impulse-*/PKGBUILD). With these
+    # baked, `pacman -S --needed` / `yay -S --asdeps` at install time become
+    # no-ops. The 9 AUR-only packages (adw-gtk-theme-git, breeze-plus,
+    # darkly-bin, otf-space-grotesk, qt6-avif-image-plugin,
+    # ttf-material-symbols-variable-git, ttf-readex-pro, ttf-rubik-vf,
+    # ttf-twemoji) plus the dots themselves still download at install time.
+    # The metapkgs and quickshell are BUILT at install time (makepkg), so the
+    # toolchain entries (cmake, ninja, clang, ...) are deliberate.
+    - bc
+    - bluedevil
+    - breeze
+    - brightnessctl
+    - cairomm
+    - cava
+    - clang
+    - cli11
+    - cliphist
+    - cmake
+    - coreutils
+    - cpptrace
+    - ddcutil
+    - dolphin
+    - eza
+    - fish
+    - fontconfig
+    - fuzzel
+    - geoclue
+    - glib2
+    - gnome-keyring
+    - go-yq
+    - gobject-introspection
+    - gtk4
+    - gtkmm3
+    - gtksourceviewmm
+    - hypridle
+    - hyprlock
+    - hyprpicker
+    - hyprshot
+    - hyprsunset
+    - imagemagick
+    - jemalloc
+    - jq
+    - kdialog
+    - kirigami
+    - libadwaita
+    - libdbusmenu-gtk3
+    - libdrm
+    - libpipewire
+    - libportal-gtk4
+    - libqalculate
+    - libsoup3
+    - libxcb
+    - matugen
+    - mesa
+    - networkmanager
+    - ninja
+    - pavucontrol-qt
+    - pipewire-pulse
+    - plasma-nm
+    - playerctl
+    - polkit-kde-agent
+    - qt6-5compat
+    - qt6-base
+    - qt6-declarative
+    - qt6-imageformats
+    - qt6-multimedia
+    - qt6-positioning
+    - qt6-quicktimeline
+    - qt6-sensors
+    - qt6-shadertools
+    - qt6-svg
+    - qt6-tools
+    - qt6-translations
+    - qt6-virtualkeyboard
+    - qt6-wayland
+    - ripgrep
+    - slurp
+    - songrec
+    - spirv-tools
+    - swappy
+    - syntax-highlighting
+    - systemsettings
+    - tesseract
+    - tesseract-data-eng
+    - tinyxml2
+    - translate-shell
+    - ttf-jetbrains-mono-nerd
+    - upower
+    - uv
+    - vulkan-headers
+    - wayland-protocols
+    - wf-recorder
+    - wireplumber
+    - wl-clipboard
+    - wlogout
+    - wtype
+    - xdg-desktop-portal
+    - xdg-desktop-portal-kde
+    - ydotool
   packages-init:
     dinit:
       - artix-live-dinit    # live-session services (removed again by the

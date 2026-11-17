@@ -79,6 +79,18 @@ Przepływ (jeden, bez podziału online/offline):
    komunikatem (notatka ląduje w `/etc/blitzart/README-repos`, a dotfiles
    później: `sudo install-dotfiles --user <name>`).
 
+Zależności instalatora end-4 (illogical-impulse) są **upieczone w ISO** —
+102 pakiety z repo Arch/Artix (zestaw Qt6, KDE, toolchain do buildowania
+quickshell, fonty, narzędzia), więc `--needed` przy instalacji dotfiles jest
+w większości no-opem. W runtime pobierane są tylko: 9 pakietów tylko z AUR
+(`adw-gtk-theme-git`, `breeze-plus`, `darkly-bin`, `otf-space-grotesk`,
+`qt6-avif-image-plugin`, `ttf-material-symbols-variable-git`,
+`ttf-readex-pro`, `ttf-rubik-vf`, `ttf-twemoji`), clone dotów + submodułów,
+yay (budowany z AUR), pakiety python przez `uv` i samo budowanie
+meta-pakietów/quickshella. Listę pakietów wygenerowano z
+`sdata/dist-arch/illogical-impulse-*/PKGBUILD` w repo end-4 — po większej
+zmianie u end-4 trzeba ją odświeżyć.
+
 ## Struktura
 
 ```
