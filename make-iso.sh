@@ -63,8 +63,25 @@ done
 (( no_sync )) || sync_stage
 
 # ---- smoke test (no root required) -------------------------------------------------
-echo "==> Checking profile (buildiso -q)"
-buildiso -p "$PROFILE_NAME" -i dinit -q || die "Profile check failed -- fix profile.yaml before building."
+# NOTE: `buildiso -q` (pretend) ALWAYS exits 1 by design (buildiso.in:
+# "${pretend} && display_settings && exit 1"), so its exit code cannot be
+# used. Instead we validate what it prints: if profile.yaml is missing or
+# broken, the live-session fields come out as "null" or yq prints an error.
+echo "==> Checking profile (buildiso -q, pretend build)"
+smoke="$(buildiso -p "$PROFILE_NAME" -i dinit -q 2>&1 || true)"
+printf '%s\n' "$smoke"
+
+profile_bad=0
+grep -Eq "(LIVEUSER|PASSWORD|AUTOLOGIN|SERVICES): null" <<<"$smoke" \
+    && { echo "ERROR: live-session fields are null -- profile.yaml missing or unparseable." >&2; profile_bad=1; }
+grep -q "^Error:" <<<"$smoke" \
+    && { echo "ERROR: yq reported an error while reading profile.yaml/common.yaml." >&2; profile_bad=1; }
+grep -Eq "profile: ${PROFILE_NAME}$" <<<"$smoke" \
+    || { echo "ERROR: profile '$PROFILE_NAME' was not picked up." >&2; profile_bad=1; }
+grep -q "LIVEUSER: blitz" <<<"$smoke" \
+    || { echo "ERROR: LIVEUSER is not 'blitz'." >&2; profile_bad=1; }
+(( profile_bad )) && die "Profile check failed -- fix profile.yaml before building."
+echo "==> Profile OK"
 
 # ---- build -------------------------------------------------------------------------
 echo
